@@ -83,6 +83,7 @@ ONLINE_STORE_CLASS_FOR_TYPE = {
     "qdrant": "feast.infra.online_stores.qdrant_online_store.qdrant.QdrantOnlineStore",
     "couchbase.online": "feast.infra.online_stores.couchbase_online_store.couchbase.CouchbaseOnlineStore",
     "milvus": "feast.infra.online_stores.milvus_online_store.milvus.MilvusOnlineStore",
+    "mongodb": "feast.infra.online_stores.mongodb_online_store.mongodb.MongoDBOnlineStore",
     **LEGACY_ONLINE_STORE_CLASS_FOR_TYPE,
 }
 

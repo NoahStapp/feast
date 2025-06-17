@@ -1,11 +1,11 @@
 import warnings
-from datetime import datetime
-from typing import Optional, Sequence, Union, List, Tuple, Dict, Any, Callable
+import datetime
+from typing import Optional, Sequence, List, Tuple, Dict, Any, Callable, Literal
 
+import pymongo
 from pydantic import StrictStr
 
 from feast import RepoConfig, FeatureView, Entity, utils
-from feast.infra.key_encoding_utils import serialize_entity_key
 from feast.infra.online_stores.helpers import compute_entity_id
 from feast.infra.online_stores.online_store import OnlineStore
 from feast.protos.feast.types.Value_pb2 import Value as ValueProto
@@ -18,6 +18,7 @@ class MongoDBOnlineStoreConfig(FeastConfigBaseModel):
     """
     Configuration for the MongoDB online store.
     """
+    type: Literal["mongodb"] = "mongodb"
     connection_string: Optional[StrictStr] = None
 
 
@@ -35,14 +36,24 @@ class MongoDBOnlineStore(OnlineStore):
         online_store_config = config.online_store
         assert isinstance(online_store_config, MongoDBOnlineStoreConfig)
 
+        self.collection = self._get_client(config).get_database(database_name).get_collection(collection_name)
+
+        return self.collection
+
+    def _get_client(self, config: RepoConfig):
+        """
+        Obtain a connection to the MongoDB server.
+        """
+        online_store_config = config.online_store
+        assert isinstance(online_store_config, MongoDBOnlineStoreConfig)
+
         if not self._client:
             self._client = MongoClient(
                 f"{online_store_config.connection_string or 'mongodb://localhost:27017/'}",
             )
 
-        self.collection = self._client.get_database(database_name).get_collection(collection_name)
+        return self._client
 
-        return self.collection
 
     def online_write_batch(
         self,
@@ -74,7 +85,7 @@ class MongoDBOnlineStore(OnlineStore):
         batch = []
         for entity_key, features, timestamp, created_ts in data:
             batch.append(_create_feature_document(config, entity_key, features, timestamp, created_ts))
-        self._client[table.name].insert_many(batch)
+        self._get_conn(config, config.project, table.name).insert_many(batch)
 
     def online_read(
         self,
@@ -104,17 +115,27 @@ class MongoDBOnlineStore(OnlineStore):
 
         entity_ids = _to_entity_ids(config, entity_keys)
         result: List[Tuple[Optional[datetime], Optional[Dict[str, Any]]]] = []
-        for entity_key in entity_keys:
-            features_to_project = {feature: 1 for feature in requested_features}
-            if features_to_project:
-                features_to_project["event_ts"] = 1
-                docs = collection.find({entity_key: {"$exists": True}}, features_to_project)
+        # for entity_key in entity_keys:
+            # features_to_project = {feature: 1 for feature in requested_features}
+            # if features_to_project:
+            #     features_to_project["event_ts"] = 1
+            #     docs = collection.find({entity_key: {"$in": entity_ids}}, features_to_project)
+            # else:
+        # Sort by event_inserted_ts to ensure the latest value for each entity_id is first
+        docs = collection.find({"entity_id": {"$in": entity_ids}}).sort("event_inserted_ts", pymongo.DESCENDING)
+        for doc in docs:
+            vals = {}
+            for feature in doc["values"]:
+                if requested_features is None or feature in requested_features:
+                    value = ValueProto()
+                    value.ParseFromString(doc["values"][feature])
+                    vals[feature] = value
+            if vals:
+                result.append((datetime.datetime.fromisoformat(doc.get("event_ts")), vals))
             else:
-                docs = collection.find({entity_key: {"$exists": True}})
-            for doc in docs:
-                value = ValueProto()
-                value.ParseFromString(doc)
-                result.append((doc.get("event_ts"), value))
+                result.append((None, None))
+        if not result:
+            result.append((None, None))
         return result
 
 
@@ -143,9 +164,9 @@ class MongoDBOnlineStore(OnlineStore):
         project = config.project
 
         for coll in tables_to_keep:
-            self._client[project].create_collection(coll.name)
+            self._get_client(config)[project].create_collection(coll.name)
         for coll in tables_to_delete:
-            self._client[project].drop_collection(coll.name)
+            self._get_client(config)[project].drop_collection(coll.name)
 
     def teardown(
             self,
@@ -168,7 +189,7 @@ class MongoDBOnlineStore(OnlineStore):
         project = config.project
 
         for coll in tables:
-            self._client[project].drop_collection(coll.name)
+            self._get_client(config)[project].drop_collection(coll.name)
 
 def _create_feature_document(config, entity_key, features, created_ts, timestamp):
     entity_id = compute_entity_id(
@@ -177,8 +198,9 @@ def _create_feature_document(config, entity_key, features, created_ts, timestamp
     )
     return {
         "entity_id": entity_id,
-        "event_ts": str(utils.make_tzaware(timestamp)),
+        "event_ts": str(utils.make_tzaware(timestamp) if timestamp else None),
         "event_created_ts": str(utils.make_tzaware(created_ts)),
+        "event_inserted_ts": str(datetime.datetime.now(datetime.timezone.utc)),
         "values": {
             k: v.SerializeToString()
             for k, v in features.items()

@@ -498,6 +498,28 @@ test-python-universal-couchbase-online:	## Run Python Couchbase online store int
 				not test_snowflake" \
 		sdk/python/tests
 
+test-python-universal-mongodb-online:	## Run Python MongoDB online store integration tests
+	PYTHONPATH='.' \
+		FULL_REPO_CONFIGS_MODULE=sdk.python.feast.infra.online_stores.mongodb_online_store.mongodb_repo_configuration \
+		python -m pytest --integration --maxfail=10 \
+			-k "not test_historical_retrieval_with_validation and \
+				not test_historical_features_persisting and \
+				not test_universal_cli and \
+				not test_go_feature_server and \
+				not test_feature_logging and \
+				not test_reorder_columns and \
+				not test_logged_features_validation and \
+				not test_lambda_materialization_consistency and \
+				not test_offline_write and \
+				not test_push_features_to_offline_store and \
+				not gcs_registry and \
+				not s3_registry and \
+				not test_snowflake and \
+				not test_universal_types and  \
+				not test_compute and \
+				not rbac_remote_integration_test" \
+		sdk/python/tests
+
 test-python-universal: ## Run all Python integration tests
 	python -m pytest -n 8 --integration sdk/python/tests
 

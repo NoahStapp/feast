@@ -115,14 +115,8 @@ class MongoDBOnlineStore(OnlineStore):
 
         entity_ids = _to_entity_ids(config, entity_keys)
         result: List[Tuple[Optional[datetime], Optional[Dict[str, Any]]]] = []
-        # for entity_key in entity_keys:
-            # features_to_project = {feature: 1 for feature in requested_features}
-            # if features_to_project:
-            #     features_to_project["event_ts"] = 1
-            #     docs = collection.find({entity_key: {"$in": entity_ids}}, features_to_project)
-            # else:
-        # Sort by event_inserted_ts to ensure the latest value for each entity_id is first
-        docs = collection.find({"entity_id": {"$in": entity_ids}}).sort("event_inserted_ts", pymongo.DESCENDING)
+        # Sort to ensure the latest value for each entity_id is first
+        docs = collection.find({"entity_id": {"$in": entity_ids}}).sort({"event_ts": pymongo.ASCENDING, "event_inserted_ts": pymongo.DESCENDING})
         for doc in docs:
             vals = {}
             for feature in doc["values"]:

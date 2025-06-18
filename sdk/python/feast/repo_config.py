@@ -62,6 +62,7 @@ LEGACY_ONLINE_STORE_CLASS_FOR_TYPE = {
     "feast.infra.online_stores.contrib.singlestore_online_store.singlestore.SingleStoreOnlineStore": "feast.infra.online_stores.singlestore_online_store.singlestore.SingleStoreOnlineStore",
     "feast.infra.online_stores.contrib.qdrant.QdrantOnlineStore": "feast.infra.online_stores.qdrant_online_store.qdrant.QdrantOnlineStore",
     "feast.infra.online_stores.contrib.milvus.MilvusOnlineStore": "feast.infra.online_stores.milvus.MilvusOnlineStore",
+    "feast.infra.online_stores.contrib.mongodb.MongoDBOnlineStore": "feast.infra.online_stores.mongodb.MongoDBOnlineStore",
 }
 
 ONLINE_STORE_CLASS_FOR_TYPE = {

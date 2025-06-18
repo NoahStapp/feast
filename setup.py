@@ -175,6 +175,8 @@ CLICKHOUSE_REQUIRED = ["clickhouse-connect>=0.7.19"]
 
 MCP_REQUIRED = ["fastapi_mcp"]
 
+MONGODB_REQUIRED = ["pymongo>=4.13.0"]
+
 CI_REQUIRED = (
     [
         "build",
@@ -250,6 +252,7 @@ CI_REQUIRED = (
     + TORCH_REQUIRED
     + CLICKHOUSE_REQUIRED
     + MCP_REQUIRED
+    + MONGODB_REQUIRED
 )
 MINIMAL_REQUIRED = (
     GCP_REQUIRED
@@ -350,6 +353,7 @@ setup(
         "nlp": NLP_REQUIRED,
         "clickhouse": CLICKHOUSE_REQUIRED,
         "mcp": MCP_REQUIRED,
+        "mongodb": MONGODB_REQUIRED,
     },
     include_package_data=True,
     license="Apache",

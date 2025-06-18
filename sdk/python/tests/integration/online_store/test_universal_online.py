@@ -443,6 +443,7 @@ def setup_feature_store_universal_feature_views(
 
 
 def assert_feature_store_universal_feature_views_response(df: pd.DataFrame):
+    print(df.to_string())
     assertpy.assert_that(len(df)).is_equal_to(2)
     assertpy.assert_that(df["driver_id"].iloc[0]).is_equal_to(1)
     assertpy.assert_that(df["driver_id"].iloc[1]).is_equal_to(2)

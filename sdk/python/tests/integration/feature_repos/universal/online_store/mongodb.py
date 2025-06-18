@@ -1,6 +1,6 @@
 from typing import Dict
 
-from testcontainers.core.waiting_utils import wait_for_logs, wait_container_is_ready
+from testcontainers.core.waiting_utils import wait_for_logs
 from testcontainers.mongodb import MongoDbContainer
 
 from tests.integration.feature_repos.universal.online_store_creator import (
@@ -15,9 +15,7 @@ class MongoDBOnlineStoreCreator(OnlineStoreCreator):
 
     def create_online_store(self) -> Dict[str, str]:
         self.container.start()
-        log_string_to_wait_for = (
-            "Waiting for connections"
-        )
+        log_string_to_wait_for = "Waiting for connections"
 
         wait_for_logs(
             container=self.container, predicate=log_string_to_wait_for, timeout=10

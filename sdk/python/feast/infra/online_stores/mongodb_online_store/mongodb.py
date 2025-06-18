@@ -1,23 +1,24 @@
-import warnings
 import datetime
-from typing import Optional, Sequence, List, Tuple, Dict, Any, Callable, Literal
+import warnings
+from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Tuple
 
 import pymongo
 from pydantic import StrictStr
+from pymongo import MongoClient
 
-from feast import RepoConfig, FeatureView, Entity, utils
+from feast import Entity, FeatureView, RepoConfig, utils
 from feast.infra.online_stores.helpers import compute_entity_id
 from feast.infra.online_stores.online_store import OnlineStore
-from feast.protos.feast.types.Value_pb2 import Value as ValueProto
 from feast.protos.feast.types.EntityKey_pb2 import EntityKey as EntityKeyProto
+from feast.protos.feast.types.Value_pb2 import Value as ValueProto
 from feast.repo_config import FeastConfigBaseModel
-from pymongo import MongoClient
 
 
 class MongoDBOnlineStoreConfig(FeastConfigBaseModel):
     """
     Configuration for the MongoDB online store.
     """
+
     type: Literal["mongodb"] = "mongodb"
     connection_string: Optional[StrictStr] = None
 
@@ -36,7 +37,11 @@ class MongoDBOnlineStore(OnlineStore):
         online_store_config = config.online_store
         assert isinstance(online_store_config, MongoDBOnlineStoreConfig)
 
-        self.collection = self._get_client(config).get_database(database_name).get_collection(collection_name)
+        self.collection = (
+            self._get_client(config)
+            .get_database(database_name)
+            .get_collection(collection_name)
+        )
 
         return self.collection
 
@@ -54,13 +59,17 @@ class MongoDBOnlineStore(OnlineStore):
 
         return self._client
 
-
     def online_write_batch(
         self,
         config: RepoConfig,
         table: FeatureView,
         data: List[
-            Tuple[EntityKeyProto, Dict[str, ValueProto], datetime, Optional[datetime]]
+            Tuple[
+                EntityKeyProto,
+                Dict[str, ValueProto],
+                datetime.datetime,
+                Optional[datetime.datetime],
+            ]
         ],
         progress: Optional[Callable[[int], Any]],
     ) -> None:
@@ -84,7 +93,11 @@ class MongoDBOnlineStore(OnlineStore):
 
         batch = []
         for entity_key, features, timestamp, created_ts in data:
-            batch.append(_create_feature_document(config, entity_key, features, timestamp, created_ts))
+            batch.append(
+                _create_feature_document(
+                    config, entity_key, features, timestamp, created_ts
+                )
+            )
         self._get_conn(config, config.project, table.name).insert_many(batch)
 
     def online_read(
@@ -93,7 +106,7 @@ class MongoDBOnlineStore(OnlineStore):
         table: FeatureView,
         entity_keys: List[EntityKeyProto],
         requested_features: Optional[List[str]] = None,
-    ) -> List[Tuple[Optional[datetime], Optional[Dict[str, ValueProto]]]]:
+    ) -> List[Tuple[Optional[datetime.datetime], Optional[Dict[str, ValueProto]]]]:
         """
         Read feature values that map to the requested entities from the online store.
 
@@ -114,9 +127,11 @@ class MongoDBOnlineStore(OnlineStore):
         collection = self._get_conn(config, project, table.name)
 
         entity_ids = _to_entity_ids(config, entity_keys)
-        result: List[Tuple[Optional[datetime], Optional[Dict[str, Any]]]] = []
+        result: List[Tuple[Optional[datetime.datetime], Optional[Dict[str, Any]]]] = []
         # Sort to ensure the latest value for each entity_id is first
-        docs = collection.find({"entity_id": {"$in": entity_ids}}).sort({"event_ts": pymongo.ASCENDING, "event_inserted_ts": pymongo.DESCENDING})
+        docs = collection.find({"entity_id": {"$in": entity_ids}}).sort(
+            {"event_ts": pymongo.ASCENDING, "event_inserted_ts": pymongo.DESCENDING}
+        )
         for doc in docs:
             vals = {}
             for feature in doc["values"]:
@@ -125,22 +140,23 @@ class MongoDBOnlineStore(OnlineStore):
                     value.ParseFromString(doc["values"][feature])
                     vals[feature] = value
             if vals:
-                result.append((datetime.datetime.fromisoformat(doc.get("event_ts")), vals))
+                result.append(
+                    (datetime.datetime.fromisoformat(doc.get("event_ts")), vals)
+                )
             else:
                 result.append((None, None))
         if not result:
             result.append((None, None))
         return result
 
-
     def update(
-            self,
-            config: RepoConfig,
-            tables_to_delete: Sequence[FeatureView],
-            tables_to_keep: Sequence[FeatureView],
-            entities_to_delete: Sequence[Entity],
-            entities_to_keep: Sequence[Entity],
-            partial: bool,
+        self,
+        config: RepoConfig,
+        tables_to_delete: Sequence[FeatureView],
+        tables_to_keep: Sequence[FeatureView],
+        entities_to_delete: Sequence[Entity],
+        entities_to_keep: Sequence[Entity],
+        partial: bool,
     ):
         """
         Update DB schema, creating and dropping collections accordingly.
@@ -163,10 +179,10 @@ class MongoDBOnlineStore(OnlineStore):
             self._get_client(config)[project].drop_collection(coll.name)
 
     def teardown(
-            self,
-            config: RepoConfig,
-            tables: Sequence[FeatureView],
-            entities: Sequence[Entity],
+        self,
+        config: RepoConfig,
+        tables: Sequence[FeatureView],
+        entities: Sequence[Entity],
     ):
         """
         Teardown the DB, deleting collections accordingly.
@@ -185,6 +201,7 @@ class MongoDBOnlineStore(OnlineStore):
         for coll in tables:
             self._get_client(config)[project].drop_collection(coll.name)
 
+
 def _create_feature_document(config, entity_key, features, created_ts, timestamp):
     entity_id = compute_entity_id(
         entity_key,
@@ -195,11 +212,9 @@ def _create_feature_document(config, entity_key, features, created_ts, timestamp
         "event_ts": str(utils.make_tzaware(timestamp) if timestamp else None),
         "event_created_ts": str(utils.make_tzaware(created_ts)),
         "event_inserted_ts": str(datetime.datetime.now(datetime.timezone.utc)),
-        "values": {
-            k: v.SerializeToString()
-            for k, v in features.items()
-        },
+        "values": {k: v.SerializeToString() for k, v in features.items()},
     }
+
 
 def _to_entity_ids(config: RepoConfig, entity_keys: List[EntityKeyProto]):
     return [
